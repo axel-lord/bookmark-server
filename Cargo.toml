@@ -1,0 +1,17 @@
+[package]
+name = "bookmark-server"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+actix-web = "4.3.0"
+anyhow = "1.0.69"
+clap = { version = "4.1.4", features = ["derive"] }
+derivative = "2.2.0"
+derive_more = "0.99.17"
+serde = { version = "1.0.152", features = ["derive"] }
+serde_yaml = "0.9.17"
+tap = "1.0.1"
+tokio = { version = "1.25.0", features = ["full"] }

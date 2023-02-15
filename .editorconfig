@@ -1,0 +1,5 @@
+[*]
+end_of_line = lf
+
+[*.{rs,html,js,ts,css}]
+charset = utf-8
