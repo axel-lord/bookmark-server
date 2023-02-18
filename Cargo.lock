@@ -266,8 +266,11 @@ dependencies = [
  "clap",
  "derivative",
  "derive_more",
+ "proc-macro2",
+ "quote",
  "serde",
  "serde_yaml",
+ "syn",
  "tap",
  "tokio",
 ]
