@@ -1,3 +1,4 @@
+use proc_macro2::{Ident, Span};
 use quote::quote;
 use std::{
     env::{self, VarError},
@@ -6,31 +7,80 @@ use std::{
     path::Path,
 };
 
+#[derive(Debug, Clone, Copy)]
+struct Mapping<T = &'static str, U = &'static str, V = &'static str> {
+    function: T,
+    web: U,
+    file: V,
+}
+
+impl<T, U, V> Mapping<T, U, V> {
+    const fn new(function: T, web: U, file: V) -> Self {
+        Self {
+            function,
+            web,
+            file,
+        }
+    }
+}
+
 const DEV_VAR_KEY: &str = "BOOKMARK_SERVER_DEV";
-const MAPPINGS: [(&str, &str); 1] = [("index.html", "./web/index.html")];
+const MAPPINGS: [Mapping; 1] = [Mapping::new("index", "index.html", "./web/index.html")];
 
 async fn embed_html(out_file: &Path) {
-    let futures =
-        MAPPINGS.map(|(web_path, file_path)| (web_path, tokio::fs::read_to_string(file_path)));
+    let futures = MAPPINGS.map(
+        |Mapping {
+             function,
+             web,
+             file,
+         }| Mapping {
+            function: Ident::new(function, Span::call_site()),
+            web,
+            file: (file, tokio::fs::read_to_string(file)),
+        },
+    );
 
     let mut writer =
         BufWriter::new(File::create(out_file).expect("file creation in build dir should succeed"));
-    for (_web_path, future) in futures {
-        let content = future.await.expect("file and content should exist");
-        writeln!(
-            writer,
-            "{}",
-            quote! {
-                fn hello() -> &'static str {
-                    #content;
-                }
+    for Mapping {
+        function,
+        web,
+        file: (path, file),
+    } in futures
+    {
+        let content = file.await.expect("file and content should exist");
+        let content = quote! {
+            #[get(#web)]
+            async fn #function() -> impl Responder {
+                HttpResponse::Ok().body(#content)
             }
-        )
-        .expect("write should succeed");
+        };
+        println!("cargo:rerun-if-changed={path}");
+        writeln!(writer, "{content}").expect("write should succeed");
     }
     writer.flush().expect("flushing of writer should succeed");
 }
-async fn get_html(_out_file: &Path) {}
+async fn get_html(out_file: &Path) {
+    let mut writer =
+        BufWriter::new(File::create(out_file).expect("file creation in build dir should succeed"));
+    for Mapping {
+        function,
+        web,
+        file,
+    } in MAPPINGS
+    {
+        let function = Ident::new(function, Span::call_site());
+        let content = quote! {
+            #[get(#web)]
+            async fn #function() -> impl Responder {
+                HttpResponse::Ok().body(tokio::fs::read_to_string(#file).await.expect("file read should succeed"))
+            }
+
+        };
+        writeln!(writer, "{content}").expect("write should succeed");
+    }
+    writer.flush().expect("flushing of writer should succeed");
+}
 
 #[tokio::main]
 async fn main() {
