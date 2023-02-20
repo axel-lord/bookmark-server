@@ -93,16 +93,25 @@ async fn main() {
         .lines()
         .map(|l| {
             let mut column_iter = l.split(',').map(str::trim).filter(|l| !l.is_empty());
+
+            let function = column_iter
+                .next()
+                .expect("every row should have >=1 columns");
+
+            let web = column_iter
+                .next()
+                .expect("every row should have >=2 columns");
+
+            let file = column_iter.next().unwrap_or_else(|| {
+                format!("./web{}{web}", if web.starts_with('/') { "" } else { "/" })
+                    .pipe(Box::<str>::from)
+                    .pipe(Box::leak)
+            });
+
             Mapping {
-                function: column_iter
-                    .next()
-                    .expect("every row should have >=1 columns"),
-                web: column_iter
-                    .next()
-                    .expect("every row should have >=2 columns"),
-                file: column_iter
-                    .next()
-                    .expect("every row should have >=3 columns"),
+                function,
+                web,
+                file,
             }
         })
         .collect::<Vec<_>>();

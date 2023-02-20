@@ -1,1 +1,1 @@
-index, /index.html, ./web/index.html
+index, /index.html
