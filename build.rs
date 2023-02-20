@@ -84,11 +84,11 @@ fn main() {
 
             let function = column_iter
                 .next()
-                .expect("every row should have >=1 columns");
+                .expect("every row should have at least 2 columns, not no columns.");
 
             let web = column_iter
                 .next()
-                .expect("every row should have >=2 columns");
+                .expect("every row should have at least 2 coulmns, not 1 column.");
 
             let file = column_iter.next().unwrap_or_else(|| {
                 format!("./web{}{web}", if web.starts_with('/') { "" } else { "/" })
