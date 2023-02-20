@@ -7,7 +7,7 @@ use proc_macro2::{Ident, Span};
 use quote::quote;
 use std::{
     env::{self, VarError},
-    fs::File,
+    fs::{self, File},
     io::{BufWriter, Write},
     path::Path,
 };
@@ -22,35 +22,25 @@ struct Mapping<T, U, V> {
 
 type HomogenousMapping<T> = Mapping<T, T, T>;
 
-async fn embed_html(out_file: &Path, mappings: &[HomogenousMapping<&'static str>]) {
-    let futures = mappings.iter().map(
-        |Mapping {
-             function,
-             web,
-             file,
-         }| Mapping {
-            function: Ident::new(function, Span::call_site()),
-            web,
-            file: (file, tokio::fs::read_to_string(file)),
-        },
-    );
-
+fn embed_html(out_file: &Path, mappings: &[HomogenousMapping<&'static str>]) {
     let mut writer =
         BufWriter::new(File::create(out_file).expect("file creation in build dir should succeed"));
     for Mapping {
         function,
         web,
-        file: (path, file),
-    } in futures
+        file,
+    } in mappings
     {
-        let content = file.await.expect("file and content should exist");
+        let function = Ident::new(function, Span::call_site());
+        let content = fs::read_to_string(file)
+            .unwrap_or_else(|e| panic!("{file} should exist end be readable, {e}"));
         let content = quote! {
             #[get(#web)]
             async fn #function() -> impl Responder {
                 HttpResponse::Ok().body(#content)
             }
         };
-        println!("cargo:rerun-if-changed={path}");
+        println!("cargo:rerun-if-changed={file}");
         writeln!(writer, "{content}").expect("write should succeed");
     }
     writer.flush().expect("flushing of writer should succeed");
@@ -78,15 +68,13 @@ fn get_html(out_file: &Path, mappings: &[HomogenousMapping<&'static str>]) {
     writer.flush().expect("flushing of writer should succeed");
 }
 
-#[tokio::main]
-async fn main() {
+fn main() {
     println!("cargo:rerun-if-env-changed={DEV_VAR_KEY}");
     println!("cargo:rerun-if-changed={DIRECTORY_LISTING}");
 
     let out_dir = env::var_os("OUT_DIR").expect("OUT_DIR enviroment variable should exist");
     let out_file = Path::new(&out_dir).join("locations.rs");
-    let mappings = tokio::fs::read_to_string(DIRECTORY_LISTING)
-        .await
+    let mappings = fs::read_to_string(DIRECTORY_LISTING)
         .unwrap_or_else(|e| panic!("reading of {DIRECTORY_LISTING} should succeed, {e}"))
         .pipe(Box::<str>::from)
         .pipe(Box::leak)
@@ -122,7 +110,7 @@ async fn main() {
             get_html(&out_file, &mappings);
         }
         Err(VarError::NotPresent) | Ok(_) => {
-            embed_html(&out_file, &mappings).await;
+            embed_html(&out_file, &mappings);
         }
         Err(e) => panic!("issue parsing enviroment variable ${{{DEV_VAR_KEY}}}, {e}"),
     };

@@ -19,6 +19,4 @@ tokio = { version = "1.25.0", features = ["full"] }
 [build-dependencies]
 proc-macro2 = "1.0.51"
 quote = "1.0.23"
-syn = "1.0.107"
 tap = "1.0.1"
-tokio = { version = "1.25.0", features = ["full"] }
